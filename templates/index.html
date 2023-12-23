@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>餐饮分析</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background-color: #333;
+            color: white;
+            text-align: right;
+            padding: 10px;
+        }
+
+        #charts-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            padding: 20px;
+        }
+
+        .chart {
+            width: 85%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chart img {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+        }
+
+        select {
+            padding: 8px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <label for="citySelect">选择城市:</label>
+    <select id="citySelect" onchange="loadCharts()">
+        <option value="beijing">北京</option>
+        <option value="shanghai">上海</option>
+    </select>
+
+    <label for="chartSelect">选择图表:</label>
+    <select id="chartSelect" onchange="loadCharts()">
+        <option value="percentage_of_categories">餐厅类型占比</option>
+        <option value="region_average_prices">各商区平均价格</option>
+        <option value="region_most_popular_types">各商区最受欢迎的餐厅类型</option>
+    </select>
+</header>
+
+<div id="charts-container"></div>
+
+<script>
+    function loadCharts() {
+        const citySelect = document.getElementById('citySelect');
+        const chartSelect = document.getElementById('chartSelect');
+        const selectedCity = citySelect.value;
+        const selectedChart = chartSelect.value;
+
+        // Fetch data from the server using POST
+        fetch('/charts', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                city: selectedCity,
+                chart: selectedChart,
+            }),
+        })
+            .then(response => response.blob())  // Use blob() to get binary data
+            .then(data => {
+                // Clear existing charts
+                const chartsContainer = document.getElementById('charts-container');
+                chartsContainer.innerHTML = '';
+
+                // Create a new chart element
+                const chartElement = document.createElement('div');
+                chartElement.className = 'chart';
+
+                // Create an image element for the chart
+                const chartImage = document.createElement('img');
+                chartImage.src = URL.createObjectURL(data);
+                chartImage.alt = 'Chart';
+                chartElement.appendChild(chartImage);
+
+                // Append the chart element to the charts container
+                chartsContainer.appendChild(chartElement);
+            })
+            .catch(error => console.error('Error fetching chart data:', error));
+    }
+
+    window.onload = loadCharts;
+</script>
+</body>
+</html>
