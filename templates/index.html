@@ -25,14 +25,14 @@
             padding: 20px;
         }
 
-        .chart {
+        #charts-container .chart {
             width: 85%;
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        .chart img {
+        #charts-container .chart img {
             max-width: 100%;
             max-height: 100%;
             width: auto;
@@ -43,6 +43,29 @@
         select {
             padding: 8px;
             font-size: 16px;
+        }
+
+        #toggleButton {
+            padding: 8px;
+            font-size: 16px;
+        }
+
+        #charts-container.multi-chart {
+            flex-direction: row;
+            overflow-y: auto;
+        }
+
+        #charts-container.multi-chart .chart {
+            width: 30%;
+            margin: 1% 0;
+        }
+
+        #charts-container.multi-chart .chart img {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
         }
     </style>
 </head>
@@ -60,48 +83,123 @@
         <option value="region_average_prices">各商区平均价格</option>
         <option value="region_most_popular_types">各商区最受欢迎的餐厅类型</option>
     </select>
+
+    <button id="toggleButton" onclick="toggleMode()">大图模式</button>
 </header>
 
 <div id="charts-container"></div>
 
 <script>
+    let isBigImageMode = true;
+
     function loadCharts() {
         const citySelect = document.getElementById('citySelect');
         const chartSelect = document.getElementById('chartSelect');
         const selectedCity = citySelect.value;
         const selectedChart = chartSelect.value;
 
-        // Fetch data from the server using POST
-        fetch('/charts', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                city: selectedCity,
-                chart: selectedChart,
-            }),
-        })
-            .then(response => response.blob())  // Use blob() to get binary data
-            .then(data => {
-                // Clear existing charts
-                const chartsContainer = document.getElementById('charts-container');
-                chartsContainer.innerHTML = '';
+        const chartsContainer = document.getElementById('charts-container');
+        chartsContainer.innerHTML = '';
 
-                // Create a new chart element
-                const chartElement = document.createElement('div');
-                chartElement.className = 'chart';
+        if (isBigImageMode) {
+            chartsContainer.classList.remove('multi-chart'); // Remove multi-chart class to the charts container
+            fetchAndAppendChart(chartsContainer, selectedCity, selectedChart);
+        } else {
+            chartsContainer.classList.add('multi-chart'); // Add multi-chart class to the charts container
+            fetchAndAppendChart(chartsContainer, selectedCity);
+        }
+    }
 
-                // Create an image element for the chart
-                const chartImage = document.createElement('img');
-                chartImage.src = URL.createObjectURL(data);
-                chartImage.alt = 'Chart';
-                chartElement.appendChild(chartImage);
+    function toggleMode() {
+        isBigImageMode = !isBigImageMode;
+        const toggleButton = document.getElementById('toggleButton');
+        const chartSelect = document.getElementById('chartSelect');
 
-                // Append the chart element to the charts container
-                chartsContainer.appendChild(chartElement);
+        if (isBigImageMode) {
+            toggleButton.innerText = '大图模式';
+            chartSelect.disabled = false;
+        } else {
+            toggleButton.innerText = '多图模式';
+            chartSelect.disabled = true;
+        }
+
+        loadCharts();
+    }
+
+    async function fetchAndAppendChart(chartsContainer, selectedCity, selectedChart = null) {
+        if (selectedChart === null) {  // isBigImageMode is false
+            const charts = [
+                'percentage_of_categories',
+                'region_average_prices',
+                'region_most_popular_types',
+            ];
+
+            const fetchPromises = charts.map(async chartType => {
+                // Fetch data from the server using POST
+                const response = await fetch('/charts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        city: selectedCity,
+                        chart: chartType,
+                    }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Error fetching chart data for ${chartType}`);
+                }
+
+                return response.blob();
+            });
+
+            try {
+                const chartBlobs = await Promise.all(fetchPromises);
+
+                // Create and append chart elements for each fetched chart
+                chartBlobs.forEach(data => {
+                    const chartElement = document.createElement('div');
+                    chartElement.className = 'chart';
+
+                    const chartImage = document.createElement('img');
+                    chartImage.src = URL.createObjectURL(data);
+                    chartImage.alt = 'Chart';
+                    chartElement.appendChild(chartImage);
+
+                    chartsContainer.appendChild(chartElement);
+                });
+            } catch (error) {
+                console.error('Error fetching chart data:', error);
+            }
+        } else {  // isBigImageMode is true
+            fetch('/charts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    city: selectedCity,
+                    chart: selectedChart,
+                }),
             })
-            .catch(error => console.error('Error fetching chart data:', error));
+                .then(response => response.blob())  // Use blob() to get binary data
+                .then(data => {
+                    // Create a new chart element
+                    const chartElement = document.createElement('div');
+                    chartElement.className = 'chart';
+
+                    // Create an image element for the chart
+                    const chartImage = document.createElement('img');
+                    chartImage.src = URL.createObjectURL(data);
+                    chartImage.alt = 'Chart';
+                    chartElement.appendChild(chartImage);
+
+                    // Append the chart element to the charts container
+                    chartsContainer.appendChild(chartElement);
+                })
+                .catch(error => console.error('Error fetching chart data:', error));
+        }
     }
 
     window.onload = loadCharts;
